@@ -16,8 +16,8 @@
     }
   ],
   "env": {
-    "MONGODB_USERNAME": "@mongodb_username",
-    "MONGODB_PASSWORD": "@mongodb_password",
-    "SECRET_KEY": "@secret_key"
+    "MONGODB_USERNAME": "MONGODB_USERNAME",
+    "MONGODB_PASSWORD": "MONGODB_PASSWORD",
+    "SECRET_KEY": "SECRET_KEY"
   }
 }
