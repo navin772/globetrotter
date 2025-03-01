@@ -16,8 +16,16 @@ export const UserProvider = ({ children }) => {
   }, []);
 
   const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('globetrotter_user', JSON.stringify(userData));
+    // Ensure score properties are initialized
+    const normalizedUserData = {
+      ...userData,
+      score: userData.score || 0,
+      correct_answers: userData.correct_answers || 0,
+      total_answers: userData.total_answers || 0
+    };
+    
+    setUser(normalizedUserData);
+    localStorage.setItem('globetrotter_user', JSON.stringify(normalizedUserData));
   };
 
   const logout = () => {
