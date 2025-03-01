@@ -6,7 +6,7 @@ Globetrotter is a full-stack web application where users get cryptic clues about
 
 The project is divided into two main parts:
 
-- **Backend**: Python FastAPI application with MongoDB database
+- **Backend**: Python FastAPI application with MongoDB Atlas database
 - **Frontend**: React.js application with styled-components
 
 ## Features
@@ -25,7 +25,7 @@ The project is divided into two main parts:
 
 - Node.js (v14+)
 - Python (v3.8+)
-- MongoDB
+- MongoDB Atlas account (or local MongoDB)
 
 ### Backend Setup
 
@@ -39,7 +39,14 @@ cd backend
 pip install -r requirements.txt
 ```
 
-3. Make sure MongoDB is running on your system or set the MONGODB_URL environment variable.
+3. Create a `.env` file with your MongoDB Atlas credentials:
+```
+MONGODB_USERNAME=your_username
+MONGODB_PASSWORD=your_password
+SECRET_KEY=your_secret_key
+```
+
+Note: The MongoDB URI will be constructed in the code with proper escaping of the username and password.
 
 4. Run the server:
 ```
@@ -72,23 +79,66 @@ npm start
 
 The frontend will be available at http://localhost:3000
 
+## Running the Application
+
+You can use the provided script to run both the backend and frontend:
+
+```
+./run_app.sh
+```
+
 ## Deployment
 
-### Backend Deployment
+### Backend Deployment on Vercel
 
-The backend can be deployed to any platform that supports Python applications, such as:
-- Heroku
-- AWS Elastic Beanstalk
-- Google Cloud Run
-- DigitalOcean App Platform
+1. Make sure you have the Vercel CLI installed:
+```
+npm install -g vercel
+```
 
-### Frontend Deployment
+2. Set up your environment variables in Vercel:
+```
+vercel secrets add mongodb_username your_username
+vercel secrets add mongodb_password your_password
+vercel secrets add secret_key your_secret_key
+```
 
-The frontend is designed to be easily deployed to:
-- Vercel
-- Netlify
-- GitHub Pages
-- Firebase Hosting
+3. Deploy the backend:
+```
+cd backend
+vercel
+```
+
+### Frontend Deployment on Vercel
+
+1. Update the `.env` file with your deployed backend URL:
+```
+REACT_APP_API_URL=https://your-backend-url.vercel.app
+```
+
+2. Deploy the frontend:
+```
+cd frontend
+vercel
+```
+
+## MongoDB Atlas Setup
+
+The application uses MongoDB Atlas for the database. The data is stored in:
+
+- Database: `city_data`
+- Collection: `cities`
+
+The collection contains documents with the following structure:
+```json
+{
+  "city": "City Name",
+  "country": "Country Name",
+  "clues": ["Clue 1", "Clue 2"],
+  "fun_fact": ["Fun Fact 1", "Fun Fact 2"],
+  "trivia": ["Trivia 1", "Trivia 2"]
+}
+```
 
 ## Dataset
 

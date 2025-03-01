@@ -7,7 +7,38 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add timeout to prevent long-hanging requests
+  timeout: 10000,
+  // Handle CORS issues
+  withCredentials: false,
 });
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error);
+    
+    // Network errors
+    if (!error.response) {
+      return Promise.reject({
+        detail: 'Network error. Please check your connection and try again.'
+      });
+    }
+    
+    // Server errors
+    if (error.response.status >= 500) {
+      return Promise.reject({
+        detail: 'Server error. Please try again later.'
+      });
+    }
+    
+    // Return the error response data or a default message
+    return Promise.reject(
+      error.response.data || { detail: 'Something went wrong. Please try again.' }
+    );
+  }
+);
 
 export const createUser = async (username) => {
   try {

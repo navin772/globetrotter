@@ -1,16 +1,21 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
 from pydantic import BaseModel
 from typing import List, Optional
 import random
-import json
 import os
+import json
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import secrets
+from dotenv import load_dotenv
+import urllib.parse
 
+# Load environment variables
+load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(title="Globetrotter API")
@@ -25,7 +30,16 @@ app.add_middleware(
 )
 
 # Database connection
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_USERNAME = os.getenv("MONGODB_USERNAME")
+MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD")
+# Escape username and password for MongoDB URI
+if MONGODB_USERNAME and MONGODB_PASSWORD:
+    escaped_username = urllib.parse.quote_plus(MONGODB_USERNAME)
+    escaped_password = urllib.parse.quote_plus(MONGODB_PASSWORD)
+    MONGODB_URI = os.getenv("MONGODB_URI", f"mongodb+srv://{escaped_username}:{escaped_password}@cluster0globe.5lwkr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0globe")
+else:
+    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+
 client = None
 db = None
 
@@ -68,38 +82,33 @@ class Token(BaseModel):
     token_type: str
     username: str
 
-# Load destinations from JSON file
-destinations = []
-
 @app.on_event("startup")
-async def startup_db_client():
-    global client, db, destinations
-    client = AsyncIOMotorClient(MONGODB_URL)
-    db = client.globetrotter
-    
-    # Load destinations from JSON file
+def startup_db_client():
+    global client, db
     try:
-        with open("data.json", "r") as f:
-            destinations = json.load(f)
-    except FileNotFoundError:
-        # Try relative path
-        try:
-            with open("backend/data.json", "r") as f:
-                destinations = json.load(f)
-        except FileNotFoundError:
-            print("Error: Could not find data.json file")
-            destinations = []
-    
-    # Check if destinations are already in the database
-    count = await db.destinations.count_documents({})
-    if count == 0:
-        # Insert destinations into the database
-        await db.destinations.insert_many(destinations)
+        # Connect to MongoDB Atlas
+        client = MongoClient(MONGODB_URI, server_api=ServerApi('1'))
+        
+        # Ping the database to confirm connection
+        client.admin.command('ping')
+        print("Successfully connected to MongoDB Atlas!")
+        
+        # Use the city_data database and cities collection
+        db = client.city_data
+        
+        # Check if we can access the cities collection
+        cities_count = db.cities.count_documents({})
+        print(f"Found {cities_count} cities in the database")
+        
+    except Exception as e:
+        print(f"Error connecting to MongoDB Atlas: {e}")
+        raise
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
+def shutdown_db_client():
     if client:
         client.close()
+        print("MongoDB connection closed")
 
 # Helper functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -112,10 +121,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_random_question(num_options=4):
+def get_random_question(num_options=4):
     # Get all destinations from the database
-    cursor = db.destinations.find({})
-    all_destinations = await cursor.to_list(length=None)
+    all_destinations = list(db.cities.find({}))
     
     if not all_destinations:
         raise HTTPException(status_code=404, detail="No destinations found")
@@ -144,14 +152,14 @@ async def get_random_question(num_options=4):
         "correct_answer": correct_destination["city"]
     }
 
-async def get_destination_by_city(city: str):
-    destination = await db.destinations.find_one({"city": city})
+def get_destination_by_city(city: str):
+    destination = db.cities.find_one({"city": city})
     if not destination:
         raise HTTPException(status_code=404, detail=f"Destination {city} not found")
     return destination
 
-async def update_user_score(username: str, correct: bool):
-    user = await db.users.find_one({"username": username})
+def update_user_score(username: str, correct: bool):
+    user = db.users.find_one({"username": username})
     if not user:
         raise HTTPException(status_code=404, detail=f"User {username} not found")
     
@@ -164,18 +172,18 @@ async def update_user_score(username: str, correct: bool):
         }
     }
     
-    await db.users.update_one({"username": username}, update_data)
-    return await db.users.find_one({"username": username})
+    db.users.update_one({"username": username}, update_data)
+    return db.users.find_one({"username": username})
 
 # Routes
 @app.get("/")
-async def root():
+def root():
     return {"message": "Welcome to Globetrotter API"}
 
 @app.post("/users", response_model=Token)
-async def create_user(user: UserCreate):
+def create_user(user: UserCreate):
     # Check if username already exists
-    existing_user = await db.users.find_one({"username": user.username})
+    existing_user = db.users.find_one({"username": user.username})
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
@@ -188,7 +196,7 @@ async def create_user(user: UserCreate):
         "created_at": datetime.utcnow()
     }
     
-    await db.users.insert_one(new_user)
+    db.users.insert_one(new_user)
     
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -203,8 +211,8 @@ async def create_user(user: UserCreate):
     }
 
 @app.get("/users/{username}")
-async def get_user(username: str):
-    user = await db.users.find_one({"username": username})
+def get_user(username: str):
+    user = db.users.find_one({"username": username})
     if not user:
         raise HTTPException(status_code=404, detail=f"User {username} not found")
     
@@ -213,21 +221,21 @@ async def get_user(username: str):
     return user
 
 @app.get("/game/question", response_model=GameQuestion)
-async def get_question():
-    return await get_random_question()
+def get_question():
+    return get_random_question()
 
 @app.post("/game/answer")
-async def submit_answer(answer: AnswerSubmission, username: Optional[str] = None):
+def submit_answer(answer: AnswerSubmission, username: Optional[str] = None):
     correct = answer.selected_city == answer.correct_city
     
     # Get fun fact for the correct destination
-    destination = await get_destination_by_city(answer.correct_city)
+    destination = get_destination_by_city(answer.correct_city)
     fun_fact = random.choice(destination["fun_fact"]) if destination["fun_fact"] else ""
     
     # Update user score if username is provided
     user = None
     if username:
-        user = await update_user_score(username, correct)
+        user = update_user_score(username, correct)
         user["_id"] = str(user["_id"])
     
     return {
@@ -237,8 +245,8 @@ async def submit_answer(answer: AnswerSubmission, username: Optional[str] = None
     }
 
 @app.get("/game/challenge/{username}")
-async def get_challenge_info(username: str):
-    user = await db.users.find_one({"username": username})
+def get_challenge_info(username: str):
+    user = db.users.find_one({"username": username})
     if not user:
         raise HTTPException(status_code=404, detail=f"User {username} not found")
     
