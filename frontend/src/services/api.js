@@ -1,6 +1,9 @@
 import axios from 'axios';
 
+// Get API URL from environment or use localhost as fallback
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+console.log('API URL:', API_URL); // Log the API URL for debugging
 
 const api = axios.create({
   baseURL: API_URL,
@@ -8,8 +11,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   // Add timeout to prevent long-hanging requests
-  timeout: 10000,
-  // Handle CORS issues
+  timeout: 15000,
+  // Don't use credentials for CORS
   withCredentials: false,
 });
 
@@ -21,15 +24,15 @@ api.interceptors.response.use(
     
     // Network errors
     if (!error.response) {
-      return Promise.reject({
-        detail: 'Network error. Please check your connection and try again.'
+      return Promise.reject({ 
+        detail: 'Network error. Please check your connection and try again.' 
       });
     }
     
     // Server errors
     if (error.response.status >= 500) {
-      return Promise.reject({
-        detail: 'Server error. Please try again later.'
+      return Promise.reject({ 
+        detail: 'Server error. Please try again later.' 
       });
     }
     
