@@ -11,6 +11,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import secrets
 
+
 # Initialize FastAPI app
 app = FastAPI(title="Globetrotter API")
 
