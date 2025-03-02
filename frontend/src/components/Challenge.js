@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { UserContext } from '../context/UserContext';
 import { getChallengeInfo, createUser } from '../services/api';
+import Confetti from 'react-confetti';
 
 const ChallengeContainer = styled.div`
   display: flex;
@@ -118,6 +119,62 @@ const LoadingText = styled.p`
   text-align: center;
 `;
 
+const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const Popup = styled.div`
+  background-color: #fff;
+  color: #333;
+  border-radius: 10px;
+  padding: 2rem;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  position: relative;
+`;
+
+const PopupTitle = styled.h3`
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #1e5799;
+`;
+
+const PopupText = styled.p`
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+`;
+
+const PopupButton = styled(Button)`
+  margin: 0 auto;
+  display: block;
+`;
+
+const CloseButton = styled.button`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #666;
+  
+  &:hover {
+    color: #333;
+  }
+`;
+
 const Challenge = () => {
   const { username } = useParams();
   const [challengeInfo, setChallengeInfo] = useState(null);
@@ -125,6 +182,9 @@ const Challenge = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [acceptedUser, setAcceptedUser] = useState(null);
   const { user, login } = useContext(UserContext);
   const navigate = useNavigate();
 
@@ -163,15 +223,41 @@ const Challenge = () => {
     try {
       const userData = await createUser(newUsername);
       login(userData);
-      navigate('/game');
+      
+      // Show popup with challenge accepted notification
+      setAcceptedUser({
+        username: newUsername,
+        score: 0,
+        correct_answers: 0,
+        total_answers: 0
+      });
+      setShowPopup(true);
+      setShowConfetti(true);
+      
+      // Don't navigate immediately, let the user see the popup
     } catch (err) {
       setError(err.detail || 'Failed to create user. Please try again.');
-    } finally {
       setFormLoading(false);
     }
   };
 
   const handlePlayAsGuest = () => {
+    // Show popup with challenge accepted notification
+    setAcceptedUser({
+      username: "Guest",
+      score: 0,
+      correct_answers: 0,
+      total_answers: 0
+    });
+    setShowPopup(true);
+    setShowConfetti(true);
+    
+    // Don't navigate immediately, let the user see the popup
+  };
+  
+  const handleClosePopup = () => {
+    setShowPopup(false);
+    setShowConfetti(false);
     navigate('/game');
   };
 
@@ -204,6 +290,8 @@ const Challenge = () => {
 
   return (
     <ChallengeContainer>
+      {showConfetti && <Confetti recycle={false} numberOfPieces={200} />}
+      
       <Header>
         <Logo onClick={() => navigate('/')}>🌍 Globetrotter</Logo>
       </Header>
@@ -223,7 +311,11 @@ const Challenge = () => {
           </ScoreDisplay>
           
           {user ? (
-            <Button onClick={() => navigate('/game')}>
+            <Button onClick={() => {
+              setAcceptedUser(user);
+              setShowPopup(true);
+              setShowConfetti(true);
+            }}>
               Accept Challenge
             </Button>
           ) : (
@@ -242,9 +334,9 @@ const Challenge = () => {
                 {error && <ErrorMessage>{error}</ErrorMessage>}
               </Form>
               
-              <Button 
-                secondary 
-                margin="1rem 0 0 0" 
+              <Button
+                secondary
+                margin="1rem 0 0 0"
                 onClick={handlePlayAsGuest}
               >
                 Play as Guest
@@ -252,6 +344,27 @@ const Challenge = () => {
             </>
           )}
         </ChallengeCard>
+      )}
+      
+      {showPopup && (
+        <Overlay>
+          <Popup>
+            <CloseButton onClick={handleClosePopup}>&times;</CloseButton>
+            <PopupTitle>Challenge Accepted! 🎉</PopupTitle>
+            <PopupText>
+              {acceptedUser?.username} has accepted {challengeInfo?.username}'s challenge!
+            </PopupText>
+            <PopupText>
+              Current Score: {acceptedUser?.score || 0} points
+            </PopupText>
+            <PopupText>
+              Can you beat {challengeInfo?.username}'s score of {challengeInfo?.score} points?
+            </PopupText>
+            <PopupButton onClick={handleClosePopup}>
+              Start Playing
+            </PopupButton>
+          </Popup>
+        </Overlay>
       )}
     </ChallengeContainer>
   );
