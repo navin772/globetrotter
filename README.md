@@ -8,6 +8,7 @@ The project is divided into two main parts:
 
 - **Backend**: Python FastAPI application with MongoDB Atlas database
 - **Frontend**: React.js application with styled-components
+- **Tests**: E2E tests written with Selenium WebDriver
 
 ## Features
 
@@ -55,6 +56,17 @@ python run.py
 
 The backend will be available at http://localhost:8000
 
+The hosted backend is available at https://globetrotterbackend.vercel.app, check the health with https://globetrotterbackend.vercel.app/health.
+
+5. Backed tests:
+
+Endpoint tests are written in `tests/test_api.py` and can be run with the following command:
+```bash
+pytest tests/test_api.py
+```
+Make sure the env is correctly configured and the backend is running before running the tests.
+
+
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
@@ -86,6 +98,16 @@ You can use the provided script to run both the backend and frontend:
 ```
 ./run_app.sh
 ```
+## Running E2E tests with Selenium
+
+1. Install the required packages:
+    ```bash
+    pip install selenium pytest
+    ```
+2. Run the tests:
+    ```bash
+    pytest tests/test-e2e.py
+    ```
 
 ## Deployment
 
@@ -106,7 +128,7 @@ vercel secrets add secret_key your_secret_key
 3. Deploy the backend:
 ```
 cd backend
-vercel
+vercel deploy
 ```
 
 ### Frontend Deployment on Vercel
@@ -119,7 +141,7 @@ REACT_APP_API_URL=https://your-backend-url.vercel.app
 2. Deploy the frontend:
 ```
 cd frontend
-vercel
+vercel deploy
 ```
 
 ## MongoDB Atlas Setup
@@ -141,6 +163,8 @@ The collection contains documents with the following structure:
 ```
 
 ## Dataset
+
+The initial dataset was expanded to 105 destinations. The dataset is stored in the `city_data` collection in the MongoDB database.
 
 The application uses a dataset of famous destinations with:
 - City and country information

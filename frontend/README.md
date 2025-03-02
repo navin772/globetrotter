@@ -45,7 +45,7 @@ This app is designed to be easily deployed to Vercel or Netlify:
 
 ### Vercel
 1. Install Vercel CLI: `npm i -g vercel`
-2. Run `vercel` in the project directory
+2. Run `vercel deploy` in the project directory
 3. Follow the prompts to deploy
 
 ### Netlify
