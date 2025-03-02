@@ -490,6 +490,26 @@ async def get_challenge_info(username: str, db=Depends(get_db)):
         print(error_msg)
         raise HTTPException(status_code=500, detail=error_msg)
 
+
+@app.delete("/users/{username}")
+async def delete_user(username: str, db=Depends(get_db)):
+    try:
+        print(f"Deleting user: {username}")
+        result = db.users.delete_one({"username": username})
+
+        if result.deleted_count == 0:
+            print(f"User {username} not found")
+            raise HTTPException(status_code=404, detail=f"User {username} not found")
+
+        print(f"User {username} deleted successfully")
+        return {"message": f"User {username} deleted successfully"}
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        error_msg = f"Error deleting user: {str(e)}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
