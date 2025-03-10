@@ -31,17 +31,6 @@ const Score = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.2);
 `;
 
-// Add button for "Challenge a Friend"
-const ShareButton = styled(Button)`
-  margin-left: 0.5rem;
-  background: ${colors.secondary};
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  
-  &:hover {
-    background: ${colors.accent};
-  }
-`;
 
 const ClueContainer = styled.div`
   margin-bottom: 2rem;
