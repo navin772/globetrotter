@@ -2,75 +2,45 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import Confetti from 'react-confetti';
+// eslint-disable-next-line no-unused-vars
 import html2canvas from 'html2canvas';
 import { UserContext } from '../context/UserContext';
+import { useToast } from '../hooks/useToast';
 import { getQuestion, submitAnswer } from '../services/api';
-
-const GameContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 100vh;
-  padding: 20px;
-  background: linear-gradient(135deg, #1e5799 0%, #207cca 51%, #2989d8 100%);
-  color: white;
-`;
-
-const Header = styled.header`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 800px;
-  margin-bottom: 2rem;
-`;
-
-const Logo = styled.h1`
-  font-size: 1.8rem;
-  margin: 0;
-  cursor: pointer;
-`;
+import {
+  Container,
+  Card,
+  Button,
+  Header,
+  Logo,
+  colors,
+} from '../styles/SharedStyles';
+import LoadingSpinner from './LoadingSpinner';
 
 const UserInfo = styled.div`
   display: flex;
   align-items: center;
+  gap: 1rem;
 `;
 
 const Score = styled.div`
-  margin-right: 1rem;
   font-size: 1.2rem;
-`;
-
-const Button = styled.button`
-  padding: 10px 15px;
-  background-color: ${props => props.secondary ? '#6c757d' : '#ff6b6b'};
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  margin: ${props => props.margin || '0'};
-
-  &:hover {
-    background-color: ${props => props.secondary ? '#5a6268' : '#ff5252'};
-  }
-
-  &:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-  }
-`;
-
-const GameCard = styled.div`
-  background-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 800px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+`;
+
+// Add button for "Challenge a Friend"
+const ShareButton = styled(Button)`
+  margin-left: 0.5rem;
+  background: ${colors.secondary};
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  
+  &:hover {
+    background: ${colors.accent};
+  }
 `;
 
 const ClueContainer = styled.div`
@@ -78,49 +48,102 @@ const ClueContainer = styled.div`
 `;
 
 const ClueTitle = styled.h2`
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: ${colors.accent};
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
 `;
 
 const Clue = styled.p`
   font-size: 1.2rem;
-  background-color: rgba(0, 0, 0, 0.2);
-  padding: 1rem;
-  border-radius: 5px;
-  margin-bottom: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateX(5px);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
 `;
 
 const OptionsContainer = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  outline: none;
 `;
 
 const OptionButton = styled.button`
-  padding: 1rem;
-  background-color: ${props => {
-    if (props.selected && props.result === 'correct') return '#4caf50';
-    if (props.selected && props.result === 'incorrect') return '#f44336';
-    if (props.correct && props.result === 'incorrect') return '#4caf50';
-    return 'rgba(255, 255, 255, 0.2)';
+  padding: 1.2rem;
+  background: ${props => {
+    if (props.selected && props.result === 'correct') return colors.success;
+    if (props.selected && props.result === 'incorrect') return colors.error;
+    if (props.correct && props.result === 'incorrect') return colors.success;
+    return 'rgba(255, 255, 255, 0.1)';
   }};
   color: white;
-  border: none;
-  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
   font-size: 1rem;
   cursor: ${props => props.disabled ? 'default' : 'pointer'};
-  transition: background-color 0.3s;
+  transition: all 0.3s ease;
   text-align: left;
+  position: relative;
+  overflow: hidden;
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px ${colors.accent};
+    transform: translateY(-2px);
+  }
+
+  &:focus:not(:focus-visible) {
+    box-shadow: none;
+    transform: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px ${colors.accent};
+    transform: translateY(-2px);
+  }
 
   &:hover {
-    background-color: ${props => props.disabled ? '' : 'rgba(255, 255, 255, 0.3)'};
+    transform: ${props => props.disabled ? 'none' : 'translateY(-2px)'};
+    background: ${props => props.disabled ? '' : 'rgba(255, 255, 255, 0.2)'};
+    box-shadow: ${props => props.disabled ? 'none' : '0 5px 15px rgba(0, 0, 0, 0.2)'};
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      rgba(255, 255, 255, 0.2),
+      rgba(255, 255, 255, 0)
+    );
+    transform: rotate(45deg);
+    transition: all 0.3s ease;
+    opacity: 0;
+  }
+
+  &:hover::after {
+    opacity: ${props => props.disabled ? 0 : 1};
+    transform: rotate(45deg) translate(50%, 50%);
   }
 `;
 
 const OptionCity = styled.div`
   font-weight: bold;
   font-size: 1.1rem;
+  margin-bottom: 0.3rem;
 `;
 
 const OptionCountry = styled.div`
@@ -129,29 +152,55 @@ const OptionCountry = styled.div`
 `;
 
 const FeedbackContainer = styled.div`
-  margin-top: 1rem;
-  padding: 1rem;
-  background-color: ${props => props.correct ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)'};
-  border-radius: 5px;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: ${props => props.correct ? 
+    'rgba(76, 175, 80, 0.2)' : 
+    'rgba(244, 67, 54, 0.2)'};
+  border-radius: 10px;
   text-align: center;
+  border: 1px solid ${props => props.correct ? 
+    'rgba(76, 175, 80, 0.5)' : 
+    'rgba(244, 67, 54, 0.5)'};
+  animation: fadeIn 0.5s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 `;
 
 const FeedbackTitle = styled.h3`
-  font-size: 1.3rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: ${props => props.correct ? colors.success : colors.error};
 `;
 
 const FeedbackText = styled.p`
   font-size: 1.1rem;
+  line-height: 1.6;
 `;
 
-const ChallengeButton = styled(Button)`
-  margin-top: 1rem;
-`;
-
+// eslint-disable-next-line no-unused-vars
 const LoadingText = styled.p`
   font-size: 1.2rem;
   text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 2rem 0;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
 `;
 
 const Overlay = styled.div`
@@ -160,149 +209,114 @@ const Overlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 `;
 
-const Popup = styled.div`
-  background-color: #fff;
-  color: #333;
-  border-radius: 10px;
-  padding: 2rem;
-  width: 90%;
+const SharePopup = styled(Card)`
+  background: white;
+  color: ${colors.primary};
   max-width: 500px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  text-align: center;
   position: relative;
+  animation: slideIn 0.3s ease-out;
+  padding: 2rem;
+
+  @keyframes slideIn {
+    from {
+      transform: translateY(-50px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
 `;
 
 const PopupTitle = styled.h3`
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  color: #1e5799;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: ${colors.primary};
+  text-align: center;
 `;
 
 const PopupText = styled.p`
   font-size: 1.1rem;
   margin-bottom: 1.5rem;
+  color: ${colors.primary};
+  line-height: 1.6;
+  text-align: center;
+`;
+
+const ShareInput = styled.input`
+  width: 100%;
+  padding: 0.8rem;
+  border: 2px solid ${colors.primary};
+  border-radius: 8px;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  color: ${colors.primary};
 `;
 
 const CloseButton = styled.button`
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 1rem;
+  right: 1rem;
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   cursor: pointer;
-  color: #666;
+  color: ${colors.primary};
+  opacity: 0.6;
+  transition: all 0.3s ease;
   
   &:hover {
-    color: #333;
+    opacity: 1;
+    transform: scale(1.1);
   }
 `;
 
-const ImageContainer = styled.div`
-  margin: 1rem 0;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  overflow: hidden;
-  max-width: 100%;
+const ChallengeButton = styled(Button)`
+  margin: 2rem auto 0;
+  display: block;
+  background: ${colors.secondary};
   
-  img {
-    max-width: 100%;
-    display: block;
+  &:hover {
+    background: ${colors.accent};
   }
-`;
-
-const TextArea = styled.textarea`
-  width: 100%;
-  padding: 10px;
-  margin: 1rem 0;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-  min-height: 80px;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: 10px;
-  margin: 1rem 0;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-`;
-
-const ButtonGroup = styled.div`
-  display: flex;
-  justify-content: space-between;
-  margin-top: 1rem;
-  
-  button {
-    flex: 1;
-    margin: 0 0.5rem;
-    
-    &:first-child {
-      margin-left: 0;
-    }
-    
-    &:last-child {
-      margin-right: 0;
-    }
-  }
-`;
-
-const CaptureContainer = styled.div`
-  position: relative;
-  width: 100%;
-  max-width: 500px;
-  margin: 0 auto;
-  background: linear-gradient(135deg, #1e5799 0%, #207cca 51%, #2989d8 100%);
-  padding: 20px;
-  border-radius: 10px;
-  color: white;
-  text-align: center;
-  display: none;
-`;
-
-const CaptureTitle = styled.h2`
-  font-size: 2rem;
-  margin-bottom: 1rem;
-`;
-
-const CaptureMessage = styled.p`
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  font-weight: bold;
-`;
-
-const CaptureLogo = styled.div`
-  font-size: 3rem;
-  margin-bottom: 1rem;
 `;
 
 const Game = () => {
+  const { showToast } = useToast();
   const [question, setQuestion] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showChallengePopup, setShowChallengePopup] = useState(false);
-  const [challengeImage, setChallengeImage] = useState(null);
-  const [customMessage, setCustomMessage] = useState('');
-  const [generatingImage, setGeneratingImage] = useState(false);
-  const [challengeLink, setChallengeLink] = useState('');
+  const [focusedIndex, setFocusedIndex] = useState(0);
   const { user, updateScore } = useContext(UserContext);
   const navigate = useNavigate();
-  
-  // Refs for capturing elements
-  const captureRef = useRef(null);
-  const gameContainerRef = useRef(null);
+  // eslint-disable-next-line no-unused-vars
+  const firstOptionRef = useRef(null);
+  const optionsContainerRef = useRef(null);
+  const [showSharePopup, setShowSharePopup] = useState(false);
+  const [challengeUrl, setChallengeUrl] = useState('');
+  const shareInputRef = useRef(null);
 
   const fetchQuestion = async () => {
     setLoading(true);
@@ -317,6 +331,7 @@ const Game = () => {
       setQuestion(data);
     } catch (err) {
       setError('Failed to load question. Please try again.');
+      showToast('Failed to load question. Please try again.', 'error');
       console.error(err);
     } finally {
       setLoading(false);
@@ -325,7 +340,51 @@ const Game = () => {
 
   useEffect(() => {
     fetchQuestion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleChallengeClick = () => {
+    if (!user) {
+      showToast('Please login to challenge friends', 'info');
+      navigate('/');
+      return;
+    }
+    
+    // Create share URL
+    const url = `${window.location.origin}/challenge/${user.username}`;
+    setChallengeUrl(url);
+    setShowSharePopup(true);
+    
+    // Focus the input after popup appears
+    setTimeout(() => {
+      if (shareInputRef.current) {
+        shareInputRef.current.select();
+      }
+    }, 100);
+  };
+  
+  const copyToClipboard = () => {
+    if (shareInputRef.current) {
+      shareInputRef.current.select();
+      document.execCommand('copy');
+      showToast('Challenge link copied to clipboard! Share it with your friends.', 'success');
+    }
+  };
+  
+  const handleShareViaWebShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'Challenge from Globetrotter',
+        text: `I've challenged you to beat my score of ${user.score} points in Globetrotter!`,
+        url: challengeUrl,
+      })
+      .then(() => {
+        showToast('Challenge shared!', 'success');
+        setShowSharePopup(false);
+      })
+      .catch(err => console.error('Error sharing:', err));
+    }
+  };
 
   const handleOptionSelect = async (option) => {
     if (selectedOption || loading) return;
@@ -349,98 +408,31 @@ const Game = () => {
         setShowConfetti(true);
         if (user) {
           updateScore(true);
+          showToast('Correct! Well done! 🎉', 'success');
         }
       } else {
         if (user) {
           updateScore(false);
+          showToast('Not quite right. Try another one! 💪', 'info');
         }
       }
     } catch (err) {
       setError('Failed to submit answer. Please try again.');
+      showToast('Failed to submit answer. Please try again.', 'error');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Function to generate the challenge image
-  const generateChallengeImage = async () => {
-    if (!captureRef.current) return;
-    
-    setGeneratingImage(true);
-    
-    try {
-      // Make the capture container visible
-      captureRef.current.style.display = 'block';
-      
-      // Generate the image
-      const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: null,
-        scale: 2, // Higher quality
-        logging: false,
-        useCORS: true
-      });
-      
-      // Convert canvas to data URL
-      const imageUrl = canvas.toDataURL('image/png');
-      setChallengeImage(imageUrl);
-      
-      // Hide the capture container again
-      captureRef.current.style.display = 'none';
-    } catch (err) {
-      console.error('Error generating image:', err);
-      // If image generation fails, we'll just use text
-    } finally {
-      setGeneratingImage(false);
-    }
-  };
-  
-  // Function to handle closing the challenge popup
-  const handleClosePopup = () => {
-    setShowChallengePopup(false);
-    setChallengeImage(null);
-    setCustomMessage('');
-  };
-  
-  // Function to send the challenge via WhatsApp
-  const handleSendChallenge = () => {
-    // Create WhatsApp share link
-    const message = customMessage || `I challenge you to beat my score of ${user.score} in Globetrotter! Can you guess these destinations? ${challengeLink}`;
-    const whatsappLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    
-    // Open WhatsApp share
-    window.open(whatsappLink, '_blank');
-    
-    // Close the popup
-    handleClosePopup();
-  };
-
-  const handleChallenge = () => {
-    if (!user) {
-      navigate('/');
-      return;
-    }
-    
-    // Generate challenge link
-    const link = `${window.location.origin}/challenge/${user.username}`;
-    setChallengeLink(link);
-    
-    // Set default custom message
-    setCustomMessage(`I challenge you to beat my score of ${user.score} in Globetrotter! Can you guess these destinations? ${link}`);
-    
-    // Generate the challenge image
-    generateChallengeImage();
-    
-    // Show the challenge popup
-    setShowChallengePopup(true);
-  };
-
   return (
-    <GameContainer ref={gameContainerRef}>
+    <Container>
       {showConfetti && <Confetti recycle={false} numberOfPieces={200} />}
       
       <Header>
-        <Logo onClick={() => navigate('/')}>🌍 Globetrotter</Logo>
+        <Logo onClick={() => navigate('/')}>
+          <span className="globe-icon">🌍</span> Globetrotter
+        </Logo>
         {user && (
           <UserInfo>
             <Score>
@@ -454,14 +446,14 @@ const Game = () => {
       </Header>
       
       {loading && !question ? (
-        <LoadingText>Loading question...</LoadingText>
+        <LoadingSpinner text="Preparing your next destination..." />
       ) : error ? (
-        <div>
-          <p>{error}</p>
+        <Card>
+          <FeedbackText>{error}</FeedbackText>
           <Button onClick={fetchQuestion}>Try Again</Button>
-        </div>
+        </Card>
       ) : question && (
-        <GameCard>
+        <Card>
           <ClueContainer>
             <ClueTitle>Where am I?</ClueTitle>
             {question.clues.map((clue, index) => (
@@ -469,15 +461,64 @@ const Game = () => {
             ))}
           </ClueContainer>
           
-          <OptionsContainer>
+          <OptionsContainer 
+            ref={optionsContainerRef}
+            role="group" 
+            aria-label="Available destinations"
+            onKeyDown={(e) => {
+              if (selectedOption) return;
+              
+              const optionsCount = question.options.length;
+              let newIndex = -1;
+
+              switch(e.key) {
+                case 'ArrowRight':
+                case 'ArrowDown':
+                  e.preventDefault();
+                  newIndex = (focusedIndex + 1) % optionsCount;
+                  break;
+                case 'ArrowLeft':
+                case 'ArrowUp':
+                  e.preventDefault();
+                  newIndex = (focusedIndex - 1 + optionsCount) % optionsCount;
+                  break;
+                case 'Home':
+                  e.preventDefault();
+                  newIndex = 0;
+                  break;
+                case 'End':
+                  e.preventDefault();
+                  newIndex = optionsCount - 1;
+                  break;
+                default:
+                  return;
+              }
+
+              if (newIndex !== -1) {
+                const buttons = e.currentTarget.getElementsByTagName('button');
+                buttons[newIndex]?.focus();
+                setFocusedIndex(newIndex);
+              }
+            }}
+          >
             {question.options.map((option, index) => (
               <OptionButton
                 key={index}
                 onClick={() => handleOptionSelect(option)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleOptionSelect(option);
+                  }
+                }}
                 selected={selectedOption?.city === option.city}
                 correct={option.city === question.correct_answer}
                 result={result ? (selectedOption?.city === option.city ? (result.correct ? 'correct' : 'incorrect') : '') : ''}
                 disabled={!!selectedOption}
+                tabIndex={!selectedOption ? 0 : -1}
+                role="button"
+                aria-pressed={selectedOption?.city === option.city}
+                aria-disabled={!!selectedOption}
+                aria-label={`Select ${option.city}, ${option.country}`}
               >
                 <OptionCity>{option.city}</OptionCity>
                 <OptionCountry>{option.country}</OptionCountry>
@@ -487,79 +528,70 @@ const Game = () => {
           
           {result && (
             <FeedbackContainer correct={result.correct}>
-              <FeedbackTitle>
+              <FeedbackTitle correct={result.correct}>
                 {result.correct ? '🎉 Correct!' : '😢 Incorrect!'}
               </FeedbackTitle>
               <FeedbackText>{result.funFact}</FeedbackText>
+              <ButtonGroup>
+                <Button 
+                  onClick={fetchQuestion}
+                >
+                  Next Destination
+                </Button>
+              </ButtonGroup>
             </FeedbackContainer>
           )}
           
-          {result && (
-            <Button margin="1rem 0 0 0" onClick={fetchQuestion}>
-              Next Destination
-            </Button>
+          {user && (
+            <ChallengeButton onClick={handleChallengeClick}>
+              Challenge a Friend
+            </ChallengeButton>
           )}
-        </GameCard>
+        </Card>
       )}
       
-      {user && (
-        <ChallengeButton onClick={handleChallenge}>
-          Challenge a Friend
-        </ChallengeButton>
-      )}
-      
-      {/* Hidden container for capturing the challenge image */}
-      <CaptureContainer ref={captureRef}>
-        <CaptureLogo>🌍</CaptureLogo>
-        <CaptureTitle>Globetrotter Challenge</CaptureTitle>
-        <CaptureMessage>{user?.username} invites you to GlobeTrotter! Play now!</CaptureMessage>
-      </CaptureContainer>
-      
-      {/* Challenge Popup */}
-      {showChallengePopup && (
-        <Overlay>
-          <Popup>
-            <CloseButton onClick={handleClosePopup}>&times;</CloseButton>
-            <PopupTitle>Challenge a Friend</PopupTitle>
+      {showSharePopup && (
+        <Overlay
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="share-popup-title"
+        >
+          <SharePopup>
+            <CloseButton 
+              onClick={() => setShowSharePopup(false)}
+              aria-label="Close share popup"
+            >
+              &times;
+            </CloseButton>
+            <PopupTitle id="share-popup-title">
+              Challenge Your Friends! 🏆
+            </PopupTitle>
+            <PopupText>
+              Share this link with your friends to challenge them to beat your score of {user?.score || 0} points!
+            </PopupText>
             
-            {generatingImage ? (
-              <LoadingText>Generating image...</LoadingText>
-            ) : challengeImage ? (
-              <ImageContainer>
-                <img src={challengeImage} alt="Challenge" />
-              </ImageContainer>
-            ) : (
-              <PopupText>
-                Share this challenge with your friends and see if they can beat your score!
-              </PopupText>
-            )}
-            
-            <PopupText>Customize your message:</PopupText>
-            <TextArea
-              value={customMessage}
-              onChange={(e) => setCustomMessage(e.target.value)}
-              placeholder="Enter your custom message here..."
-            />
-            
-            <PopupText>Challenge link:</PopupText>
-            <Input
-              value={challengeLink}
+            <ShareInput
+              ref={shareInputRef}
+              type="text"
+              value={challengeUrl}
               readOnly
-              onClick={(e) => e.target.select()}
+              aria-label="Challenge URL"
             />
             
             <ButtonGroup>
-              <Button secondary onClick={handleClosePopup}>
-                Cancel
+              <Button onClick={copyToClipboard}>
+                Copy Link
               </Button>
-              <Button onClick={handleSendChallenge}>
-                Send Invitation
-              </Button>
+              {navigator.share && (
+                <Button secondary onClick={handleShareViaWebShare}>
+                  Share...
+                </Button>
+              )}
             </ButtonGroup>
-          </Popup>
+          </SharePopup>
         </Overlay>
       )}
-    </GameContainer>
+    </Container>
   );
 };
 

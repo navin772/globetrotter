@@ -1,6 +1,6 @@
 {
   "short_name": "Globetrotter",
-  "name": "🌍 Globetrotter",
+  "name": "Globetrotter - World Travel Quiz",
   "icons": [
     {
       "src": "favicon.svg",
@@ -8,18 +8,39 @@
       "type": "image/svg+xml"
     },
     {
-      "src": "favicon.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192"
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
-      "src": "favicon.svg",
-      "type": "image/svg+xml",
-      "sizes": "512x512"
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#1e5799",
-  "background_color": "#207cca"
+  "theme_color": "#1a2a6c",
+  "background_color": "#1a2a6c",
+  "orientation": "portrait",
+  "description": "Test your knowledge of world destinations with this interactive quiz game!",
+  "categories": ["games", "education", "travel"],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Start New Game",
+      "url": "/game",
+      "description": "Start a new Globetrotter game"
+    }
+  ]
 }
