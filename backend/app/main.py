@@ -14,12 +14,77 @@ import secrets
 from dotenv import load_dotenv
 import urllib.parse
 from functools import lru_cache
+from contextlib import asynccontextmanager
 
 # Load environment variables
 load_dotenv()
 
-# Initialize FastAPI app
-app = FastAPI(title="Globetrotter API")
+# Database connection variables
+MONGODB_USERNAME = os.getenv("MONGODB_USERNAME", "")
+MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "")
+# Escape username and password for MongoDB URI
+if MONGODB_USERNAME and MONGODB_PASSWORD:
+    escaped_username = urllib.parse.quote_plus(MONGODB_USERNAME)
+    escaped_password = urllib.parse.quote_plus(MONGODB_PASSWORD)
+    MONGODB_URI = os.getenv("MONGODB_URI", f"mongodb+srv://{escaped_username}:{escaped_password}@cluster0globe.5lwkr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0globe")
+else:
+    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+
+# Global variables for database connections
+client = None
+db = None
+
+# Replace on_event with the new lifespan approach
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic (previously in on_event("startup"))
+    global client, db
+    try:
+        print(f"Connecting to MongoDB with URI: {MONGODB_URI.replace(MONGODB_PASSWORD, '********') if MONGODB_PASSWORD else MONGODB_URI}")
+        
+        # Connect to MongoDB Atlas with a timeout
+        client = MongoClient(MONGODB_URI, server_api=ServerApi('1'), connectTimeoutMS=5000, socketTimeoutMS=5000)
+        
+        # Ping the database to confirm connection
+        client.admin.command('ping')
+        print("Successfully connected to MongoDB Atlas!")
+        
+        # Use the city_data database and cities collection
+        db = client.city_data
+        
+        # Check if we can access the cities collection
+        cities_count = db.cities.count_documents({})
+        print(f"Found {cities_count} cities in the database")
+        
+        # Check if users collection exists, create it if not
+        if 'users' not in db.list_collection_names():
+            print("Creating users collection")
+            db.create_collection('users')
+        
+        users_count = db.users.count_documents({})
+        print(f"Found {users_count} users in the database")
+
+        # List the usernames of all found users
+        if users_count > 0:
+            users_list = list(db.users.find({}, {'username': 1, '_id': 0}))
+            usernames = [user['username'] for user in users_list]
+            print(f"Registered users: {', '.join(usernames)}")
+        
+    except Exception as e:
+        print(f"Error connecting to MongoDB Atlas: {str(e)}")
+        # Don't raise the exception, just log it
+        # This allows the app to start even if the database connection fails
+        # We'll handle database errors in the individual endpoints
+    
+    yield  # This is where FastAPI runs the actual application
+    
+    # Shutdown logic (previously in on_event("shutdown"))
+    if client:
+        client.close()
+        print("MongoDB connection closed")
+
+# Initialize FastAPI app with the lifespan handler
+app = FastAPI(title="Globetrotter API", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -30,6 +95,14 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# JWT settings
+SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Add CORS preflight handler for all routes
 @app.options("/{full_path:path}")
@@ -61,28 +134,6 @@ async def add_cors_headers(request: Request, call_next):
         error_response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         error_response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
         return error_response
-
-# Database connection
-MONGODB_USERNAME = os.getenv("MONGODB_USERNAME", "")
-MONGODB_PASSWORD = os.getenv("MONGODB_PASSWORD", "")
-# Escape username and password for MongoDB URI
-if MONGODB_USERNAME and MONGODB_PASSWORD:
-    escaped_username = urllib.parse.quote_plus(MONGODB_USERNAME)
-    escaped_password = urllib.parse.quote_plus(MONGODB_PASSWORD)
-    MONGODB_URI = os.getenv("MONGODB_URI", f"mongodb+srv://{escaped_username}:{escaped_password}@cluster0globe.5lwkr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0globe")
-else:
-    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-
-client = None
-db = None
-
-# JWT settings
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Models
 class User(BaseModel):
@@ -208,52 +259,6 @@ async def health_check():
             "error": str(e)
         }
 
-@app.on_event("startup")
-def startup_db_client():
-    global client, db
-    try:
-        print(f"Connecting to MongoDB with URI: {MONGODB_URI.replace(MONGODB_PASSWORD, '********') if MONGODB_PASSWORD else MONGODB_URI}")
-        
-        # Connect to MongoDB Atlas with a timeout
-        client = MongoClient(MONGODB_URI, server_api=ServerApi('1'), connectTimeoutMS=5000, socketTimeoutMS=5000)
-        
-        # Ping the database to confirm connection
-        client.admin.command('ping')
-        print("Successfully connected to MongoDB Atlas!")
-        
-        # Use the city_data database and cities collection
-        db = client.city_data
-        
-        # Check if we can access the cities collection
-        cities_count = db.cities.count_documents({})
-        print(f"Found {cities_count} cities in the database")
-        
-        # Check if users collection exists, create it if not
-        if 'users' not in db.list_collection_names():
-            print("Creating users collection")
-            db.create_collection('users')
-        
-        users_count = db.users.count_documents({})
-        print(f"Found {users_count} users in the database")
-
-        # List the usernames of all found users
-        if users_count > 0:
-            users_list = list(db.users.find({}, {'username': 1, '_id': 0}))
-            usernames = [user['username'] for user in users_list]
-            print(f"Registered users: {', '.join(usernames)}")
-        
-    except Exception as e:
-        print(f"Error connecting to MongoDB Atlas: {str(e)}")
-        # Don't raise the exception, just log it
-        # This allows the app to start even if the database connection fails
-        # We'll handle database errors in the individual endpoints
-
-@app.on_event("shutdown")
-def shutdown_db_client():
-    if client:
-        client.close()
-        print("MongoDB connection closed")
-
 # Helper functions
 def get_random_question(db, num_options=4):
     # Get all destinations from the database
@@ -310,6 +315,17 @@ def update_user_score(db, username: str, correct: bool):
 
     db.users.update_one({"username": username}, update_data)
     return db.users.find_one({"username": username})
+
+# Helper function for JWT token creation
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 # Routes
 @app.get("/")

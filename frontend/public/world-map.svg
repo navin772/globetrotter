@@ -1,0 +1,17 @@
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <path fill="currentColor" d="M200,100 q400,-50 800,100 t-800,300 t800,-100 t-800,-300" 
+        stroke="currentColor" 
+        stroke-width="2" 
+        fill="none" 
+        opacity="0.1"/>
+  <path d="M300,200 q200,-100 400,0 t-400,200 t400,-50 t-400,-150" 
+        stroke="currentColor" 
+        stroke-width="2" 
+        fill="none" 
+        opacity="0.1"/>
+  <circle cx="400" cy="300" r="5" fill="currentColor" opacity="0.2"/>
+  <circle cx="600" cy="250" r="5" fill="currentColor" opacity="0.2"/>
+  <circle cx="800" cy="350" r="5" fill="currentColor" opacity="0.2"/>
+  <circle cx="500" cy="400" r="5" fill="currentColor" opacity="0.2"/>
+  <circle cx="700" cy="200" r="5" fill="currentColor" opacity="0.2"/>
+</svg>
