@@ -225,7 +225,6 @@ async def debug_database(db=Depends(get_db)):
             "database_name": db.name,
             "collections": collections,
             "document_counts": collection_counts,
-            "mongodb_uri": MONGODB_URI.replace(MONGODB_PASSWORD, "********") if MONGODB_PASSWORD else "Not set"
         }
     except Exception as e:
         return {
