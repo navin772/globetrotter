@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import Confetti from 'react-confetti';
-// eslint-disable-next-line no-unused-vars
 import html2canvas from 'html2canvas';
 import { UserContext } from '../context/UserContext';
 import { useToast } from '../hooks/useToast';
@@ -219,10 +218,12 @@ const Overlay = styled.div`
 const SharePopup = styled(Card)`
   background: white;
   color: ${colors.primary};
-  max-width: 500px;
+  max-width: 550px;
+  width: 90%;
   position: relative;
   animation: slideIn 0.3s ease-out;
   padding: 2rem;
+  overflow: hidden;
 
   @keyframes slideIn {
     from {
@@ -233,6 +234,39 @@ const SharePopup = styled(Card)`
       transform: translateY(0);
       opacity: 1;
     }
+  }
+`;
+
+const ShareImage = styled.img`
+  max-width: 100%;
+  border-radius: 10px;
+  margin: 0 auto 1.5rem;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+`;
+
+const WhatsAppButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #25D366;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 8px;
+  
+  &:hover {
+    background: #128C7E;
+    transform: translateY(-2px);
+  }
+  
+  svg {
+    margin-right: 5px;
   }
 `;
 
@@ -305,7 +339,9 @@ const Game = () => {
   const optionsContainerRef = useRef(null);
   const [showSharePopup, setShowSharePopup] = useState(false);
   const [challengeUrl, setChallengeUrl] = useState('');
+  const [challengeImage, setChallengeImage] = useState(null);
   const shareInputRef = useRef(null);
+  const gameCardRef = useRef(null);
 
   const fetchQuestion = async () => {
     setLoading(true);
@@ -342,16 +378,96 @@ const Game = () => {
     // Create share URL
     const url = `${window.location.origin}/challenge/${user.username}`;
     setChallengeUrl(url);
-    setShowSharePopup(true);
     
-    // Focus the input after popup appears
-    setTimeout(() => {
-      if (shareInputRef.current) {
-        shareInputRef.current.select();
-      }
-    }, 100);
+    // Capture the current UI using html2canvas
+    const cardElement = document.querySelector('.game-card');
+    console.log('Card element to capture:', cardElement); // Debug log
+    
+    if (cardElement) {
+      showToast('Creating challenge image...', 'info');
+      
+      // Add a slight delay to ensure state updates are reflected in the DOM
+      setTimeout(() => {
+        html2canvas(cardElement, {
+          backgroundColor: null,
+          scale: 2, // Higher quality
+          logging: true, // Enable logging for debugging
+          allowTaint: true,
+          useCORS: true
+        }).then(canvas => {
+          console.log('Canvas generated successfully');
+          
+          // Create a new canvas for adding text overlay
+          const finalCanvas = document.createElement('canvas');
+          const ctx = finalCanvas.getContext('2d');
+          
+          // Set canvas dimensions
+          finalCanvas.width = canvas.width;
+          finalCanvas.height = canvas.height;
+          
+          // Draw the captured image
+          ctx.drawImage(canvas, 0, 0);
+          
+          // Add semi-transparent overlay for better text visibility
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Add the original image with reduced opacity
+          ctx.globalAlpha = 0.6;
+          ctx.drawImage(canvas, 0, 0);
+          ctx.globalAlpha = 1.0;
+          
+          // Significantly increase text size and improve styling
+          ctx.fillStyle = 'white';
+          
+          // Calculate font size based on canvas width (responsive)
+          const fontSize = Math.max(Math.floor(canvas.width / 15), 48); // Minimum 48px
+          ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+          ctx.textAlign = 'center';
+          
+          // Add strong text shadow for better visibility against any background
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+          ctx.shadowBlur = 15;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 3;
+          
+          // Add main invitation text
+          const text = `${user.username} challenges you!`;
+          ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+          
+          // Add smaller subtitle text below
+          const subtitleFontSize = Math.max(Math.floor(fontSize * 0.6), 32); // Smaller but still prominent
+          ctx.font = `${subtitleFontSize}px Arial, sans-serif`;
+          ctx.fillText("Play Globetrotter now!", canvas.width / 2, canvas.height / 2 + fontSize);
+          
+          // Convert to data URL and set state
+          const dataUrl = finalCanvas.toDataURL('image/png');
+          console.log('Challenge image URL generated:', dataUrl.substring(0, 100) + '...');
+          setChallengeImage(dataUrl);
+          
+          // Open popup after image is ready
+          setShowSharePopup(true);
+          
+          // Focus the input after popup appears
+          setTimeout(() => {
+            if (shareInputRef.current) {
+              shareInputRef.current.select();
+            }
+          }, 100);
+        }).catch(err => {
+          console.error('Error generating challenge image:', err);
+          showToast('Could not create challenge image', 'error');
+          setShowSharePopup(true);
+        });
+      }, 100); // Small delay to ensure DOM is ready
+    } else {
+      console.error('Game card element not found');
+      showToast('Could not create challenge image', 'error');
+      // Fallback if card element not found
+      setShowSharePopup(true);
+    }
   };
-  
+
   const copyToClipboard = () => {
     if (shareInputRef.current) {
       shareInputRef.current.select();
@@ -373,6 +489,13 @@ const Game = () => {
       })
       .catch(err => console.error('Error sharing:', err));
     }
+  };
+  
+  const handleShareViaWhatsApp = () => {
+    const text = encodeURIComponent(`I've challenged you to beat my score of ${user.score} points in Globetrotter! ${challengeUrl}`);
+    const whatsappUrl = `https://wa.me/?text=${text}`;
+    window.open(whatsappUrl, '_blank');
+    showToast('Opening WhatsApp...', 'info');
   };
 
   const handleOptionSelect = async (option) => {
@@ -437,12 +560,12 @@ const Game = () => {
       {loading && !question ? (
         <LoadingSpinner text="Preparing your next destination..." />
       ) : error ? (
-        <Card>
+        <Card className="game-card" ref={gameCardRef}>
           <FeedbackText>{error}</FeedbackText>
           <Button onClick={fetchQuestion}>Try Again</Button>
         </Card>
       ) : question && (
-        <Card>
+        <Card className="game-card" ref={gameCardRef}>
           <ClueContainer>
             <ClueTitle>Where am I?</ClueTitle>
             {question.clues.map((clue, index) => (
@@ -555,6 +678,18 @@ const Game = () => {
             <PopupTitle id="share-popup-title">
               Challenge Your Friends! 🏆
             </PopupTitle>
+            
+            {challengeImage && (
+              <div style={{ margin: '0 -2rem 1.5rem' }}>
+                <ShareImage
+                  src={challengeImage}
+                  alt={`${user.username}'s Globetrotter challenge`}
+                  onLoad={() => console.log('Challenge image loaded successfully')}
+                  onError={(e) => console.error('Image failed to load', e)}
+                />
+              </div>
+            )}
+            
             <PopupText>
               Share this link with your friends to challenge them to beat your score of {user?.score || 0} points!
             </PopupText>
@@ -571,6 +706,17 @@ const Game = () => {
               <Button onClick={copyToClipboard}>
                 Copy Link
               </Button>
+              
+              <WhatsAppButton
+                onClick={handleShareViaWhatsApp}
+                aria-label="Share via WhatsApp"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white">
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                </svg>
+                WhatsApp
+              </WhatsAppButton>
+              
               {navigator.share && (
                 <Button secondary onClick={handleShareViaWebShare}>
                   Share...
